@@ -1,0 +1,16 @@
+# Copyright (c) 2025 Adam Karpierz
+
+[build-system]
+build-backend = 'setuptools.build_meta'
+requires = ['setuptools>=80.9.0']
+
+[project]
+name        = 'pkg_name'
+version     = '0.0.0'
+description = "Deprecated package. Please use 'pkg_name' instead."
+authors     = [{ name  = 'Adam Karpierz', email = 'adam@karpierz.net' }]
+maintainers = [{ name  = 'Adam Karpierz', email = 'adam@karpierz.net' }]
+urls.Homepage   = 'https://pypi.org/project/pkg_name/'
+urls.Repository = 'https://github.com/karpierz/pkg_name'
+readme = 'README.rst'
+requires-python = '>=3.10.0,<4.0.0'
