@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import typing
 from typing import Any, NamedTuple
 import sys
 import os
@@ -63,7 +64,7 @@ def _get_package_data(package_path: Path | str | None = None) -> PackageData:
     )
 
 # Attach helper to Session class
-nox.get_package_data = _get_package_data  # noqa: E305
+nox.get_package_data = _get_package_data  # type: ignore[attr-defined] # noqa: E305
 
 
 class version_info(NamedTuple):
@@ -77,28 +78,30 @@ class Session(nox.sessions.Session):
 
     __slots__ = ()
 
-    def run_quiet(self: nox.Session, *args: Any, **kwargs: Any) -> Any | None:
+    def run_quiet(self, *args: Any, **kwargs: Any) -> str | bool | None:
         """Run a command silently: no 'nox > ...' header and no output."""
         kwargs.setdefault("silent", True)
         kwargs.setdefault("log", False)
-        return self.run(*args, **kwargs)
+        out: str | bool | None = self.run(*args, **kwargs)
+        return out
 
-    def py(self: nox.Session, *args: Any, **kwargs: Any) -> Any | None:
+    def py(self, *args: Any, **kwargs: Any) -> str | bool | None:
         """Run session python."""
-        return self.run("python", *args, **kwargs)
+        out: str | bool | None = self.run("python", *args, **kwargs)
+        return out
 
-    def py_quiet(self: nox.Session, *args: Any, **kwargs: Any) -> Any | None:
+    def py_quiet(self, *args: Any, **kwargs: Any) -> str | bool | None:
         """Run session python silently: no 'nox > ...' header and no output."""
         kwargs.setdefault("silent", True)
         kwargs.setdefault("log", False)
         return self.py(*args, **kwargs)
 
     @property
-    def is_initial_build(self: nox.Session) -> bool:
+    def is_initial_build(self) -> bool:
         return os.environ.get("PKG_INITIAL_BUILD") == "1"
 
     @property
-    def site_packages(self: nox.Session) -> Path:
+    def site_packages(self) -> Path:
         # Monkey-patch: deterministic, explicit, contributor-friendly
         return self._get_site_packages(Path(self.virtualenv.location))
 
@@ -109,30 +112,34 @@ class Session(nox.sessions.Session):
         return Path(paths["purelib"])
 
     @property
-    def python_version_info(self: nox.Session) -> version_info:
-        return version_info(*json.loads(self.run_quiet("python",
-            "-c", "import sys, json ; print(json.dumps(sys.version_info))").strip()))
+    def python_version_info(self) -> version_info:
+        out = typing.cast(str, self.run_quiet("python",
+                  "-c", "import sys, json ; print(json.dumps(sys.version_info))"))
+        return version_info(*json.loads(out.strip()))
 
     @property
-    def python_version_nodot(self: nox.Session) -> str:
-        return self.run_quiet("python",
-            "-c", "from sys import version_info as v ; print(f'{v.major}{v.minor}')").strip()
+    def python_version_nodot(self) -> str:
+        out = typing.cast(str, self.run_quiet("python",
+                  "-c", "from sys import version_info as v ; print(f'{v.major}{v.minor}')"))
+        return out.strip()
 
     @property
-    def python_implementation(self: nox.Session) -> str:
-        return self.run_quiet("python",
-            "-c", "import platform ; print(platform.python_implementation())").strip()
+    def python_implementation(self) -> str:
+        out = typing.cast(str, self.run_quiet("python",
+                  "-c", "import platform ; print(platform.python_implementation())"))
+        return out.strip()
 
     @property
-    def PKG_PVER(self: nox.Session) -> str:
+    def PKG_PVER(self) -> str:
         return self.python_version_nodot
 
     @property
-    def PKG_IMPL(self: nox.Session) -> str:
+    def PKG_IMPL(self) -> str:
         # from packaging.tags.interpreter_name()
-        name = self.run_quiet("python",
-            "-c", "import sys ; print(sys.implementation.name)").strip()
+        out = typing.cast(str, self.run_quiet("python",
+                  "-c", "import sys ; print(sys.implementation.name)"))
+        name = out.strip()
         return packaging.tags.INTERPRETER_SHORT_NAMES.get(name) or name
 
 # Attach helpers to Session class
-nox.sessions.Session = Session  # noqa: E305
+nox.sessions.Session = Session  # type: ignore[misc] # noqa: E305
