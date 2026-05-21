@@ -1,8 +1,8 @@
-# Copyright (c) 2025 Adam Karpierz
+# Copyright (c) 2026 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
 # /// script
-# dependencies = ["nox>=2025.11.12", "nox_lib"]
+# dependencies = ["nox>=2026.4.10", "nox_lib"]
 # ///
 
 from __future__ import annotations
@@ -49,23 +49,24 @@ rmtree   = partial(shutil.rmtree, ignore_errors=True)
 def prepare(session: nox.Session) -> None:
     """Preparing the repository"""
     cmd = here/".aprep.cmd"
-    if cmd.is_file(): subprocess.run([cmd])
+    if cmd.is_file(): session.run(cmd, external=True)
 
 @nox.session(python=[PY_DEFAULT], default=False)
 def cleanup(session: nox.Session) -> None:
     """Cleaning the repository"""
-#no_package = true
+    # no_package = true
     cmd = here/".clean.cmd"
-    if cmd.is_file(): subprocess.run([cmd], stderr=subprocess.DEVNULL)
+    if cmd.is_file():
+        session.run(cmd, stderr=subprocess.DEVNULL, external=True)
     rmtree(here/"build")
-    rmtree(here/"dist"),
+    rmtree(here/"dist")
     for item in here.glob("src/*.egg-info"): rmtree(item)
     for item in here.glob("**/__pycache__"): rmtree(item)
     for item in here.glob("**/.mypy_cache"): rmtree(item)
     rmtree(here/".tox")
     rmtree(here/".nox")
 
-@nox.session(python=[*PY_VERSIONS, "pypy3.10", "pypy3.11"])
+@nox.session(python=[*PY_VERSIONS, "pypy3.11", "graalpy3.12"])
 def tests(session: nox.Session) -> None:
     """Running tests"""
     session.install(".", "--group=test")
@@ -76,10 +77,15 @@ def tests(session: nox.Session) -> None:
 def coverage(session: nox.Session) -> None:
     """Running code coverage analysis"""
     session.install(".", "--group=coverage")
-    session.py("-m", "coverage", "erase")
-    session.py("-m", "coverage", "run", "-m", "tests", *session.posargs, success_codes=range(0, 256))
-    session.py("-m", "coverage", "html", success_codes=range(0, 256))
-    session.py("-m", "coverage", "report")
+    env_dir = Path(session.virtualenv.location)
+    data_file = env_dir/".coverage"
+    html_dir  = env_dir/".coverage_html"
+    session.py("-m", "coverage", "erase", f"--data-file={data_file}")
+    session.py("-m", "coverage", "run",   f"--data-file={data_file}", "-m", "tests",
+               *session.posargs, success_codes=range(0, 256))
+    session.py("-m", "coverage", "html",  f"--data-file={data_file}", f"--directory={html_dir}",
+               success_codes=range(0, 256))
+    session.py("-m", "coverage", "report", f"--data-file={data_file}")
 
 @nox.session(python=[PY_DEFAULT])
 def docs(session: nox.Session) -> None:
@@ -88,8 +94,8 @@ def docs(session: nox.Session) -> None:
     html_dir = here/"build/docs/html"
     session.py("-m", "sphinxlint", "-i", "#arch", "-i", ".nox", "-i", ".tox",
                                    "-i", "build", "-i", "dist", "-i", ".mypy_cache")
-    #session.run("python","-m", "sphinx.apidoc", "-f", *[session.site_packages/f"{item}/"
-    #                                                    for item in PKG.TOP_LEVELS])
+    # session.py("-m", "sphinx.apidoc", "-f", *[session.site_packages/f"{item}/"
+    #                                           for item in PKG.TOP_LEVELS])
     session.py("-m", "sphinx.cmd.build", "-W", "-a", "-b", "html", "-E", here/"docs", html_dir)
     session.py("-m", "sphinx.cmd.build", "-W", "-a", "-b", "doctest",    here/"docs", html_dir)
     session.py("-m", "sphinx.cmd.build", "-W", "-a", "-b", "linkcheck",  here/"docs", html_dir)
@@ -116,9 +122,9 @@ def publish(session: nox.Session) -> None:
     env_dir = Path(session.virtualenv.location)
     gh_pages_dir = env_dir/"gh-pages"
     rmtree(gh_pages_dir)
-    session.run("git", "worktree", "prune")
-    #session.run("git", "worktree", "add", gh_pages_dir, "gh-pages")
-    session.run("git", "worktree", "add", "-B", "gh-pages", gh_pages_dir)
+    session.git("worktree", "prune")
+    # session.git("worktree", "add", gh_pages_dir, "gh-pages")
+    session.git("worktree", "add", "-B", "gh-pages", gh_pages_dir)
     # clean old docs
     (gh_pages_dir/".nojekyll").touch()
     for fpath in gh_pages_dir.iterdir():
@@ -130,15 +136,15 @@ def publish(session: nox.Session) -> None:
     # copy new docs
     copytree(here/"build/docs/html", gh_pages_dir, dirs_exist_ok=True)
     # commit + push
-    session.run("git", "-C", gh_pages_dir, "add", ".")
-    session.run("git", "-C", gh_pages_dir, "commit", "-m", "Update documentation")
-    session.run("git", "-C", gh_pages_dir, "push", "--force", "origin", "gh-pages")
+    session.git("-C", gh_pages_dir, "add", ".")
+    session.git("-C", gh_pages_dir, "commit", "-m", "Update documentation")
+    session.git("-C", gh_pages_dir, "push", "--force", "origin", "gh-pages")
     # remove worktree
-    session.run("git", "worktree", "remove", "--force", gh_pages_dir)
+    session.git("worktree", "remove", "--force", gh_pages_dir)
     rmtree(gh_pages_dir)
-    session.run("git", "worktree", "prune")
+    session.git("worktree", "prune")
 
-@nox.session(python=[PY_DEFAULT], default=False)
+@nox.session(python=[PY_DEFAULT])
 def typing(session: nox.Session) -> None:
     """Static type checking"""
     session.install(".", "--group=typing")
@@ -148,4 +154,6 @@ def typing(session: nox.Session) -> None:
 def lint(session: nox.Session) -> None:
     """Checking code style and quality"""
     session.install(".", "--group=lint")
-    session.py("-m", "flake8", here/"src/")
+    env_dir = Path(session.virtualenv.location)
+    out_file = env_dir/"flake8out.txt"
+    session.py("-m", "flake8", "--output-file", out_file, here/"src/")
