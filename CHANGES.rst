@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.6.1 (2026-10-05)
+------------------
+- Added support for GraalPy 3.12
+
 0.6.0 (2026-10-03)
 ------------------
 - Added support for PyPy 3.12
