@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+__all__ = ("print", "pprint", "Session")
+__dir__ = lambda: __all__
+
 import typing
 from typing import Any, NamedTuple
 import sys
@@ -21,9 +24,6 @@ import packaging.version
 import packaging.tags
 from packaging.utils import canonicalize_name
 from packaging.utils import canonicalize_version
-
-__all__ = ('print', 'pprint', 'Session')
-__dir__ = lambda: __all__
 
 # Nox default configuration
 
